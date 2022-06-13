@@ -5,3 +5,4 @@ pyyaml
 librosa>=0.8.0
 pysndfile
 matplotlib
+TensorFlowTTS==1.8
