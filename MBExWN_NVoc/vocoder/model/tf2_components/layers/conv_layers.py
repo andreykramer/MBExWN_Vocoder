@@ -252,11 +252,11 @@ class TF2C_Conv1DUpDownSample(TF2C_Conv1DWeightNorm):
         if self.up_sample:
             #print(f"TF2C_Conv1DUpDownSample-{self.name}::call:: upsample weights_shape", self.kernel.shape,
             #      "inputs shape", inputs.shape, "res.shape", res.shape)
-            return tf.reshape(res, (res.shape[0], res.shape[1] * self.factor, -1))
+            return tf.reshape(res, (tf.shape(res)[0], tf.shape(res)[1] * self.factor, -1))
         elif self.down_sample:
             #print(f"TF2C_Conv1DUpDownSample-{self.name}::call:: downsample weights_shape", self.kernel.shape,
             #      "inputs shape", inputs.shape, "res.shape", res.shape)
-            return tf.reshape(res, (res.shape[0], -1, res.shape[2] * self.factor))
+            return tf.reshape(res, (tf.shape(res)[0], -1, tf.shape(res)[2] * self.factor))
         else:
             return res
 

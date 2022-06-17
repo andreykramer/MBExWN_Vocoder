@@ -454,7 +454,7 @@ class PulseWaveTable(tf.keras.layers.Layer):
           The accumulated phase modulo 1 in range [0, 1], shape [batch, time, ...].
         """
 
-        n_batch = phase_velocity.shape[0]
+        n_batch = tf.shape(phase_velocity)[0]
         n_time = phase_velocity.shape[1]
         n_dims = len(phase_velocity.shape)
         n_ch_dims = n_dims - 2

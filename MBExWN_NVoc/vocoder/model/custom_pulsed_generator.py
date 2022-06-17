@@ -647,13 +647,13 @@ class MBExWN(TF2C_BasePretrainableLayer):
             # for the other segments we use the predicted F0 (so this finally means in those segments teacher
             # forcing is not used)
             extF0 = F0[:, :, 0] * pred_loss_F0_mask  + (1 - pred_loss_F0_mask) * pulse_frequency[:,:F0.shape[1]]
-            extF0 = tf.concat((extF0[:, :], extF0[:,-1:] * tf.ones((extF0.shape[0], pulse_frequency.shape[1] - extF0.shape[1]))),
+            extF0 = tf.concat((extF0[:, :], extF0[:,-1:] * tf.ones((tf.shape(extF0)[0], pulse_frequency.shape[1] - extF0.shape[1]))),
                               axis = 1)
             teacher_weight = self.pp_teacher_forcing_schedule(step)
             pulse_frequency_ = pulse_frequency * (1 - teacher_weight) +  extF0 * teacher_weight
             if self.pp_subnet_suppress_uv_gradient :
                 rec_loss_F0_mask_ext = tf.concat((rec_loss_F0_mask,
-                                                  tf.zeros((rec_loss_F0_mask.shape[0],
+                                                  tf.zeros((tf.shape(rec_loss_F0_mask)[0],
                                                             pulse_frequency_.shape[1]- rec_loss_F0_mask.shape[1]),
                                                            dtype=rec_loss_F0_mask.dtype)),
                                                   axis = 1)
@@ -890,20 +890,20 @@ class MBExWN(TF2C_BasePretrainableLayer):
         # print("pulse_signal ", pulse_signal.shape)
 
         if self.pulse_pqmf is None:
-            x = tf.reshape(pulse_signal, (pulse_signal.shape[0], -1, self.pulse_channels*(1+self.pulse_generator.add_subharm_chans)))
+            x = tf.reshape(pulse_signal, (tf.shape(pulse_signal)[0], -1, self.pulse_channels*(1+self.pulse_generator.add_subharm_chans)))
         else:
-            x = self.pulse_pqmf.analysis(tf.reshape(pulse_signal[:,:,0], (pulse_signal.shape[0], pulse_signal.shape[1], 1)))
+            x = self.pulse_pqmf.analysis(tf.reshape(pulse_signal[:,:,0], (tf.shape(pulse_signal)[0], pulse_signal.shape[1], 1)))
             if self.pulse_generator.add_subharm_chans:
                 x = tf.concat( [x,
                                 tf.reshape(pulse_signal[:,:,1:],
-                                           (pulse_signal.shape[0],
+                                           (tf.shape(pulse_signal)[0],
                                             -1, self.pulse_channels*self.pulse_generator.add_subharm_chans))], axis=-1)
         # print("pulse_signal folded ", x.shape)
 
 
         # Pulse/Noise Source Prozessor
         if self.pp_mod_subnet_noise_channel_sigma:
-            x = tf.concat((x, self.pp_mod_subnet_noise_channel_sigma * tf.random.normal(x.shape[:-1]+(1,))), axis=-1)
+            x = tf.concat((x, self.pp_mod_subnet_noise_channel_sigma * tf.random.normal(tf.shape(x)[:-1]+(1,))), axis=-1)
 
         for ii, bl in enumerate(self.pp_waveNetBlocks):
             # print("in ",ii, "x", x.shape, "cond full", cond_input.shape, "sampled", cond_input_sampled.shape, "cond_step", cond_step)

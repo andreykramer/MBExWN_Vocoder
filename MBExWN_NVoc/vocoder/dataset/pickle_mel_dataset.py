@@ -53,6 +53,7 @@ class PickleMelDataset(AbstractDataset):
         preprocess_config = self.model_config["preprocess_config"]
         self.hop_size = preprocess_config["hop_size"]
         self.sr = preprocess_config["sample_rate"]
+        self.mel_channels = preprocess_config["mel_channels"]
 
         # Example parameters
         self.example_duration = example_duration
@@ -97,6 +98,10 @@ class PickleMelDataset(AbstractDataset):
         mel = MelInv.scale_mel(dd)[0, ...]
         return mel
 
+    def _load_f0(self, path):
+        f0 = iov.load_var(path)["f0_vals"]
+        return f0
+
     def get_args(self):
         return [self.utt_ids]
 
@@ -120,16 +125,28 @@ class PickleMelDataset(AbstractDataset):
                     mel, [[0, self.segment_lenght - mel_length], [0, 0]], 'constant')
                 audio = tf.pad(
                     mel, [[0, example_length - audio.shape[0]], [0, 0]], 'constant')
-
-            items = {"utt_ids": utt_id, "mels": mel, "audios": audio}
+            # TODO: Replace with correct
+            f0 = tf.expand_dims(audio, -1)
+            items = {"utt_ids": utt_id, "mels": mel, "audios": audio, "f0": f0}
 
             yield items
+
+    def get_output_shapes(self):
+        output_shapes = {
+            "utt_ids": tf.TensorShape([]),
+            # TODO parametrize the 80
+            "mels": tf.TensorShape([self.frames_per_seg, self.mel_channels]),
+            "audios": tf.TensorShape([self.example_duration * self.sr]),
+            "f0": tf.TensorShape([self.example_duration * self.sr, 1])
+        }
+        return output_shapes
 
     def get_output_dtypes(self):
         output_types = {
             "utt_ids": tf.string,
             "mels": tf.float32,
             "audios": tf.float32,
+            "f0": tf.float32
         }
         return output_types
 
@@ -142,8 +159,11 @@ class PickleMelDataset(AbstractDataset):
     ):
         """Create tf.dataset function."""
         output_types = self.get_output_dtypes()
+        output_shapes = self.get_output_shapes()
+        print(output_shapes)
         datasets = tf.data.Dataset.from_generator(
-            self.generator, output_types=output_types, args=(self.get_args())
+            self.generator, output_types=output_types, output_shapes=output_shapes, args=(
+                self.get_args())
         )
 
         if allow_cache:

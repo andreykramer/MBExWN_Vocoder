@@ -345,6 +345,7 @@ class WaveGenerator(SpectLossComponents, TF2C_BasePretrainableModel):
 
         self.mel_loss_n = None
         self.spect_loss_n = None
+        self.NPOW_loss_weight = None
 
     @property
     def has_components(self):
@@ -371,20 +372,19 @@ class WaveGenerator(SpectLossComponents, TF2C_BasePretrainableModel):
                                 "NPOW_loss"], losses)
              if ll is not None])
 
-    def summary(self, line_length=None, positions=None, print_fn=None, short=False):
-        super().summary(line_length=line_length, positions=positions, print_fn=print_fn)
-        if short:
-            return
+    # def summary(self, line_length=None, positions=None, print_fn=None, short=False):
+    #     super().summary(line_length=line_length, positions=positions, print_fn=print_fn)
+    #     if short:
+    #         return
 
-        print_fn(f"Model {self.name}")
-        for ll in self.layers:
-            print_fn(f"ll.name {ll.name} ll._built_input_shape {ll._built_input_shape}")
-            ll.summary(print_fn=print_fn)
+    #     print_fn(f"Model {self.name}")
+    #     for ll in self.layers:
+    #         print_fn(f"ll.name {ll.name} ll._built_input_shape {ll._built_input_shape}")
+    #         ll.summary(print_fn=print_fn)
 
     def total_loss(self, outputs, inputs=None, step=0):
 
         (self.mel_loss_n, self.spect_loss_n, self.NPOW_loss_n) = self.calc_losses(self.in_audio, outputs)
-
         total_loss_n = tf.constant(0, dtype=tf.float32)
         if self.spect_loss_n is not None:
             tf.summary.scalar(name='spec_loss_n', data=self.spect_loss_n)
@@ -463,18 +463,19 @@ class PaNWaveNet(WaveGenerator):
         """
         return True
 
-    def call(self, inputs, training=None, test_grad=None, *args, **kwargs):
+    def call(self, audios, mels=None, f0=None, training=None, test_grad=None, *args, **kwargs):
         """
         apply model to input tuple containing (audio, mell spectrogram, F0)
         audio and F0 are used only for internally during training for loss calculation
         """
 
-        spect = None
-        F0 = None
-        if len(inputs) == 2:
-            self.in_audio, spect = inputs
-        elif len(inputs) == 3:
-            self.in_audio, spect, F0 = inputs
+        self.in_audio = audios
+        spect = mels
+        F0 = f0
+        # if len(inputs) == 2:
+        #     self.in_audio, spect = inputs
+        # elif len(inputs) == 3:
+        #     self.in_audio, spect, F0 = inputs
 
         audio = self.infer(spect, synth_length=self.in_audio.shape[1], F0=F0,
                            training=training if (training is not None) else True, test_grad=test_grad)
@@ -487,6 +488,7 @@ class PaNWaveNet(WaveGenerator):
         """
 
         synth_length = synth_length if synth_length else self.segment_length
+        print(spect)
         if spect.shape[1] * self.spect_hop_size < synth_length:
             spect = tf.concat((spect, spect[:, -1:]), axis=1)
 
@@ -740,7 +742,7 @@ class NormMelComponents(tf.Module):
         if self.normalize_rms_num_smooth_iters > 0:
             gain_off = int(self.spect_win_size // 2)
             upsampled_rms = tf.maximum(gain[..., gain_off:gain_off + snd_lengths], tf.keras.backend.epsilon())
-            upsampled_rms = tf.reshape(upsampled_rms, (mell.shape[0], -1, self.n_group))
+            upsampled_rms = tf.reshape(upsampled_rms, (tf.shape(mell)[0], -1, self.n_group))
         else:
             upsampled_rms = self.rms_linear_interpolation_layer(rms_mel_ampl)
 
@@ -758,12 +760,12 @@ class NormMelComponents(tf.Module):
             grp_audio = grp_audio / upsampled_rms
 
         elif synth_length is not None:
-            if synth_length // self.n_group > upsampled_rms.shape[1]:
+            if synth_length // self.n_group > tf.shape(upsampled_rms)[1]:
                 upsampled_rms = tf.concat((upsampled_rms,
                                            tf.repeat(upsampled_rms[:, -1:, :],
-                                                     synth_length // self.n_group - upsampled_rms.shape[1],
+                                                     synth_length // self.n_group - tf.shape(upsampled_rms)[1],
                                                      axis=1)), axis=1)
-            elif synth_length // self.n_group < upsampled_rms.shape[1]:
+            elif synth_length // self.n_group < tf.shape(upsampled_rms)[1]:
                 upsampled_rms = upsampled_rms[:, :(synth_length // self.n_group)]
 
         return grp_audio, mell, upsampled_rms

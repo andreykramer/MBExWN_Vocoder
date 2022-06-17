@@ -106,17 +106,18 @@ class TF2C_LinInterpLayer(TF2C_BaseLayer):
                                      filter=self.kernel, strides=[1,1,1,1], padding="SAME",
                                      data_format ="NHWC", dilations=None)
         #print('LinearInterplp after depthwise_conv2d',res.shape)
+        x_shape = tf.shape(x)
         if  (not self.single_channel_mode):
-            res = tf.reshape(res, (x.shape[0],
-                                   x.shape[1],
-                                   x.shape[2], self.upsampling_factor))
+            res = tf.reshape(res, (x_shape[0],
+                                   x_shape[1],
+                                   x_shape[2], self.upsampling_factor))
             res =  tf.transpose(res, (0,1,3,2))
-        res = tf.reshape(res, (x.shape[0],
-                               x.shape[1] * self.upsampling_factor,
-                               x.shape[2]))
+        res = tf.reshape(res, (x_shape[0],
+                               x_shape[1] * self.upsampling_factor,
+                               x_shape[2]))
 
         #print('LinearInterplp after reshape',res.shape)
-        res = res[:,:(x.shape[1] - 1) * self.upsampling_factor + self.last_size, :]
+        res = res[:,:(x_shape[1] - 1) * self.upsampling_factor + self.last_size, :]
         #print('LinearInterplp after cut',res.shape)
         return res
 
